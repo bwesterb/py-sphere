@@ -32,7 +32,7 @@ class Segment:
         return 2 * math.asin(.5 * self.point1.distance_to(self.point2))
     def get_greatcircle(self):
         """ Returns the great circle of which this arc is a part. """
-        return GreatCircle(self.point1, self.point2)
+        return GreatCircle.through(self.point1, self.point2)
     def contains(self, point, assume_on_greatcircle=False):
         """ Returns whether the point is contained in the segment.
 
@@ -53,27 +53,30 @@ class Segment:
 class GreatCircle:
     """ A circle that splits the sphere in two.  Equivalently: the
         intersection of a plane with the sphere. """
-    def __init__(self, point1, point2):
-        """ Creates a great circle given by two distinct point. """
-        assert point1 != point2
-        self.point1 = point1
-        self.point2 = point2
+    def __init__(self, normal):
+        """ Creates a great circle given by the normal point of the
+            plane it determines. """
+        self.normal = normal
+    @staticmethod
+    def through(point1, point2):
+        """ Returns the great circle that goes through the given
+            points. """
+        return GreatCircle(cross(point1, point2))
     def contains(self, point):
         """ Checks whether point is contained in this great circle. """
-        return cross(self.point1, self.point2).orthogonal_to(point)
-    def intersect(self, circle):
+        return self.normal.orthogonal_to(point)
+    def intersect(self, other):
         """ Returns one of the two intersection point of this and the
             other great circle. """
-        raise NotImplementedError # TODO
-
+        assert self != other
+        return cross(self.normal, other.normal)
     def __repr__(self):
-        return "<sphere.GreatCircle %s %s>" % (self.point1, self.point2)
+        return "<sphere.GreatCircle %s>" % self.normal
 
     def __eq__(self, other):
-        return self.contains(other.point1) and self.contains(other.point2)
+        return self.normal == other.normal or -self.normal == other.normal
     def __ne__(self, other):
-        return (not self.contains(other.point1)
-                    or not self.contains(other.point2))
+        return self.normal != other.normal and -self.normal != other.normal
 
 class Point:
     """ A point on the unit sphere. """
@@ -100,7 +103,11 @@ class Point:
     def orthogonal_to(self, other):
         """ Returns whether this point is orthogonal to other. """
         return self.x * other.x + self.y * other.y + self.z * other.z == 0
-
+    def collinear(self, other):
+        """ Checks whether this point is on the same line through the
+            origin as the other point.  Or equivalently: whether this
+            point is equal or antipodal to the other. """
+        return self == other or self == -other
     def __eq__(self, other):
         return (self.x, self.y, self.z) == (other.x, other.y, other.z)
     def __ne__(self, other):
