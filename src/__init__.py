@@ -42,6 +42,8 @@ class Segment:
         if (not assume_on_greatcircle and
                 not self.get_greatcircle().contains(point)):
             return False
+        if point == self.point1 or point == self.point2:
+            return True
         # TODO add reference for this lemma.
         #      Thanks to Bram Westerbaan for the suggestion
         return (self.point1.distance_to(point) ** 2 +
