@@ -61,14 +61,19 @@ class GreatCircle:
     def contains(self, point):
         """ Checks whether point is contained in this great circle. """
         return cross(self.point1, self.point2).orthogonal_to(point)
+    def intersect(self, circle):
+        """ Returns one of the two intersection point of this and the
+            other great circle. """
+        raise NotImplementedError # TODO
 
     def __repr__(self):
         return "<sphere.GreatCircle %s %s>" % (self.point1, self.point2)
 
     def __eq__(self, other):
-        return (self.point1, self.point2) == (other.point1, other.point2)
+        return self.contains(other.point1) and self.contains(other.point2)
     def __ne__(self, other):
-        return (self.point1, self.point2) != (other.point1, other.point2)
+        return (not self.contains(other.point1)
+                    or not self.contains(other.point2))
 
 class Point:
     """ A point on the unit sphere. """
