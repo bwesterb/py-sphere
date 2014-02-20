@@ -20,6 +20,7 @@ setup(
     package_dir={'sphere': 'src'},
     license='GPL 3.0',
     install_requires=install_requires,
+    # TODO add classifiers
     classifiers = [
         ],
     test_suite='sphere.tests',
