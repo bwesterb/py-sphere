@@ -16,7 +16,7 @@ class TestCore(unittest.TestCase):
         self.p5 = sphere.Point(F(-4), F(3), F(0))
         self.p6 = sphere.Point(F(1), F(2), F(2))
         self.p7 = sphere.Point(F(-1), F(2), F(2))
-        self.p8 = sphere.Point(F(1), F(-0.1), F(2))
+        self.p8 = sphere.Point(F(1), F(-1, 10), F(2))
         self.seg1 = sphere.Segment(self.p1, self.p2)
         self.seg2 = sphere.Segment(self.p3, self.p4)
         self.seg3 = sphere.Segment(self.p4, self.p5)
