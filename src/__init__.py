@@ -36,6 +36,93 @@ class Polygon:
                 first_point = self.vertices[i - 1]
             self.segments.append(Segment(first_point, self.vertices[i]))
 
+    def intersection(self, other):
+        """ Finds the intersection of this polygon with another.  Will
+            return a list of polygons. """
+        # (I) First, check for the trivial cases:
+        # (I.1) this polygon is contained in the other.
+        self_in_other = True
+        for vertex in self.vertices:
+            if not other.contains(vertex):
+                self_in_other = False
+                break
+        if self_in_other:
+            return [self]
+        # (I.2) the other polygon is contained in this.
+        other_in_self = True
+        for vertex in other.vertices:
+            if not self.contains(vertex):
+                other_in_self = False
+                break
+        if other_in_self:
+            return [other]
+        # (II) Now create copies of this and the other polygon, adding the
+        # intersection points.
+        # (II.1) First, find the intersection points.
+        intersection_points = set()
+        self_new_points = {}
+        other_new_points = {}
+        for i in xrange(len(self.segments)):
+            self_new_points[i] = set()
+        for i in xrange(len(other.segments)):
+            other_new_points[i] = set()
+        for self_seg_i, self_seg in enumerate(self.segments):
+            # TODO improve performance.  Bounding box?
+            for other_seg_i, other_seg in enumerate(other.segments):
+                try:
+                    intersection_point = self_seg.intersection(other_seg)
+                except SameGreatCircle:
+                    continue
+                if intersection_point is None:
+                    continue
+                intersection_points.add(intersection_point)
+                if not self_seg.is_endpoint(intersection_point):
+                    self_new_points[self_seg_i].add(intersection_point)
+                if not other_seg.is_endpoint(intersection_point):
+                    other_new_points[other_seg_i].add(intersection_point)
+        # (II.2) If there are no intersection points, return empty list.
+        if not intersection_points:
+            return []
+        # (II.3) Sort intersection points by order on segments and
+        #        create the vertex lists
+        self2_vertices = []
+        other2_vertices = []
+        for i in xrange(len(self.segments)):
+            self_new_points[i] = list(self_new_points[i])
+            self_new_points[i].sort(lambda x,y:
+                    -1 if Segment(self.segments[i].point1, y).contains(x)
+                                else 1)
+            self2_vertices.append(self.segments[i].point1)
+            self2_vertices.extend(self_new_points[i])
+        for i in xrange(len(other.segments)):
+            other_new_points[i] = list(other_new_points[i])
+            other_new_points[i].sort(lambda x,y:
+                    -1 if Segment(other.segments[i].point1, y).contains(x)
+                                else 1)
+            other2_vertices.append(other.segments[i].point1)
+            other2_vertices.extend(other_new_points[i])
+        # (II.4) Create the polygon objects and point to segment look-up-tables
+        self2 = Polygon(self2_vertices, self.external_point)
+        other2 = Polygon(other2_vertices, other.external_point)
+        point_to_self2 = {}
+        point_to_other2 = {}
+        for i, point in enumerate(self2_vertices):
+            point_to_self2[point] = i
+        for i, point in enumerate(other2_vertices):
+            point_to_other2[point] = i
+        # (III) Now, extract the intersection polygons
+        while intersection_points:
+            # (III.1) first, pick an intersection point not yet extracted
+            point = intersection_points.pop()
+            i = point_to_self2[point]
+            # (III.2) trace back to a point outside the polygon
+            while other.contains(self2_vertices[i]):
+                i = (i - 1) % len(self2_vertices)
+            i = (i + 1) % len(self2_vertices)
+            on_self = True
+
+        
+
     def contains(self, point):
         """ Checks whether the polygon contains the given point. """
         # TODO prevent iteration over every segment.  Bounding box?
@@ -154,9 +241,9 @@ class Segment:
             return True
         # TODO add reference for this lemma.
         #      Thanks to Bram Westerbaan for the suggestion
-        return (self.point1.distance_to(point) ** 2 +
-                self.point2.distance_to(point) ** 2
-                    <= self.point1.distance_to(self.point2) ** 2)
+        return (self.point1.squared_distance_to(point) +
+                self.point2.squared_distance_to(point)
+                    <= self.point1.squared_distance_to(self.point2))
     def intersection(self, other):
         """ Returns intersection-point of two segments or None if
             the segments do not intersect. """
@@ -235,13 +322,17 @@ class Point:
         norm = self._get_norm()
         return (self.x / norm, self.y / norm, self.z / norm)
 
-    def distance_to(self, other):
-        """ Returns the distance to another point. """
+    def squared_distance_to(self, other):
+        """ Returns the square of the distance from this point to
+            the given other point. """
         norm_self = self._get_norm()
         norm_other = other._get_norm()
-        return math.sqrt((self.x / norm_self - other.x / norm_other)**2 +
-                         (self.y / norm_self - other.y / norm_other)**2 +
-                         (self.z / norm_self - other.z / norm_other)**2)
+        return ((self.x / norm_self - other.x / norm_other)**2 +
+                (self.y / norm_self - other.y / norm_other)**2 +
+                (self.z / norm_self - other.z / norm_other)**2)
+    def distance_to(self, other):
+        """ Returns the distance to another point. """
+        return math.sqrt(self.squared_distance_to(other))
     def orthogonal_to(self, other):
         """ Returns whether this point is orthogonal to other. """
         return scalar_product(self, other) == 0

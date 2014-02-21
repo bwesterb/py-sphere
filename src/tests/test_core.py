@@ -27,6 +27,8 @@ class TestCore(unittest.TestCase):
         self.c3 = sphere.GreatCircle.through(self.p1, self.p4)
         self.poly1 = sphere.Polygon([self.p3, self.p1, self.p4, self.p2],
                                         self.p5)
+        self.poly2 = sphere.Polygon([self.p3, self.p4, self.p5],
+                                        -self.p5)
     def test_point_distance(self):
         self.assertEqual(self.p1.distance_to(self.p2), math.sqrt(2))
         self.assertEqual(self.p1.distance_to(self.p1), 0)
@@ -71,12 +73,15 @@ class TestCore(unittest.TestCase):
         self.assertTrue(self.seg1.intersection(self.seg5) is None)
         self.assertTrue(self.seg1.intersection(self.seg2))
     def test_polygon_contains(self):
-        # TODO add tests for all cornercases
+        # TODO add tests for all (or at least more) cornercases
         self.assertTrue(self.poly1.contains(self.p6))
         self.assertFalse(self.poly1.contains(self.p5))
         self.assertFalse(self.poly1.contains(self.p7))
         self.assertFalse(self.poly1.contains(-self.p5))
         self.assertFalse(self.poly1.contains(self.p8))
+    def test_polygon_intersection(self):
+        # TODO add tests for all (or at least more) cornercases
+        print self.poly1.intersection(self.poly2)
 
 if __name__ == '__main__':
     unittest.main()
