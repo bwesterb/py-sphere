@@ -342,6 +342,29 @@ class Point:
             point is equal or antipodal to the other. """
         return (self.x * other.y == self.y * other.x and
                 self.y * other.z == self.z * other.y)
+    @property
+    def longitude(self):
+        """ Returns the longitude of the point. """
+        if self.x == 0:
+            if self.y > 0:
+                return .5 * math.pi
+            if self.y == 0:
+                return 0.0
+            return -.5 * math.pi
+        return math.atan(float(self.y) / self.x)
+    @property
+    def latitude(self):
+        """ Return the latitude of the point. """
+        x, y, z = self._get_normalized_tuple()
+        return math.asin(z)
+    @property
+    def on_northern_hemisphere(self):
+        """ Returns whether the point is on the northern hemisphere. """
+        return self.z >= 0
+    @property
+    def on_equator(self):
+        """ Returns whether the point is on the equator. """
+        return self.z == 0
     def __eq__(self, other):
         if not isinstance(other, Point):
             return False
