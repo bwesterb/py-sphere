@@ -330,9 +330,21 @@ class Polygon:
         return "<sphere.Polygon %s without %s>" % (
                     self.vertices, self.external_point)
     def __eq__(self, other):
-        raise NotImplementedError # TODO
+        for point in self.vertices:
+            if not other.contains(point):
+                return False
+        for point in other.vertices:
+            if not self.contains(point):
+                return False
+        return True
     def __ne__(self, other):
-        raise NotImplementedError # TODO
+        for point in self.vertices:
+            if not other.contains(point):
+                return True
+        for point in other.vertices:
+            if not self.contains(point):
+                return True
+        return False
 
 class Segment:
     """ A segment of a Great Circle with arc less than pi radians.  """
@@ -499,6 +511,7 @@ class Point:
             return False
         return (self.x * other.y == self.y * other.x and
                 self.y * other.z == self.z * other.y and
+                self.x * other.z == self.z * other.x and
                 (self.x * other.x > 0 or
                  self.y * other.y > 0 or
                  self.z * other.z > 0))
@@ -506,7 +519,8 @@ class Point:
         if not isinstance(other, Point):
             return True
         return ((self.x * other.y != self.y * other.x or
-                 self.y * other.z != self.z * other.y) or
+                 self.y * other.z != self.z * other.y or
+                 self.x * other.z != self.z * other.x) or
                 (self.x * other.x < 0 or
                  self.y * other.y < 0 or
                  self.z * other.z < 0))

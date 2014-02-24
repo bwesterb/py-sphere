@@ -81,7 +81,10 @@ class TestCore(unittest.TestCase):
         self.assertFalse(self.poly1.contains(self.p8))
     def test_polygon_intersection(self):
         # TODO add tests for all (or at least more) cornercases
-        print self.poly1.intersection(self.poly2)
+        ret = self.poly1.intersection(self.poly2)
+        self.assertEqual(len(ret), 1)
+        self.assertEqual(ret[0],
+                        sphere.Polygon([self.p2, self.p3, self.p4], self.p1))
 
 if __name__ == '__main__':
     unittest.main()
