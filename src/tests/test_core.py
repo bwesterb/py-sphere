@@ -85,6 +85,13 @@ class TestCore(unittest.TestCase):
         self.assertEqual(len(ret), 1)
         self.assertEqual(ret[0],
                         sphere.Polygon([self.p2, self.p3, self.p4], self.p1))
+    def test_internal_point(self):
+        internal_point1 = self.poly1.find_internal_point()
+        internal_point2 = self.poly2.find_internal_point()
+        self.assertTrue(self.poly1.contains(internal_point1))
+        self.assertTrue(self.poly2.contains(internal_point2))
+        self.assertFalse(self.poly1.border_contains(internal_point1))
+        self.assertFalse(self.poly2.border_contains(internal_point2))
 
 if __name__ == '__main__':
     unittest.main()

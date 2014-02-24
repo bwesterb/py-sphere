@@ -15,6 +15,41 @@ class Error(Exception):
     pass
 class SameGreatCircle(Error):
     pass
+class DegeneratePolygon(Error):
+    pass
+
+class Region:
+    """ A union of (open) disjoint polygons. """
+    def __init__(self, polygons):
+        # TODO check whether the polygons are disjoint
+        self.polygons = polygons
+
+    def intersection(self, other):
+        """ Returns the intersection of this region with the other. """
+        ret = []
+        for poly1 in self.polygons:
+            for poly2 in other.polygons:
+                ret.extend(poly1.intersection(poly2))
+        return Region(ret)
+
+    def union(self, other):
+        """ Returns the union of this region with another. """
+        return self.complement().intersection(other.complement()).complement()
+
+    def complement(self):
+        """ Returns the complement of this region. """
+        ret = full_sphere
+        for poly in self.polygons:
+            ret = ret.intersection(Region([poly.complement()]))
+        return ret
+
+    def __repr__(self):
+        return '<Region %s>' % self.polygons
+
+    def __eq__(self, other):
+        raise NotImplementedError
+    def __ne__(self, other):
+        raise NotImplementedError
 
 class Polygon:
     """ A polygon on the sphere. """
@@ -35,6 +70,10 @@ class Polygon:
             else:
                 first_point = self.vertices[i - 1]
             self.segments.append(Segment(first_point, self.vertices[i]))
+
+    def union(self, other):
+        """ Returns the union of two polygons. """
+        return Region([self]).union(Region([other])).polygons
 
     def intersection(self, other):
         """ Finds the intersection of this polygon with another.  Will
@@ -327,6 +366,29 @@ class Polygon:
                 continue
             intersection_count += 1
         return intersection_count % 2 != 0
+
+    def find_internal_point(self):
+        """ Tries to find an internal point. """
+        # TODO is there a more efficient method?
+        for i in xrange(len(self.vertices)):
+            j = (i + 1) % len(self.vertices)
+            k = (i + 2) % len(self.vertices)
+            center = Segment(Segment(self.vertices[i],
+                                self.vertices[j]).get_center(),
+                    Segment(self.vertices[j],
+                            self.vertices[k]).get_center()).get_center()
+            for point in (center, -center):
+                if self.border_contains(point):
+                    continue
+                if self.contains(point, assume_not_on_border=True):
+                    return point
+        raise DegeneratePolygon
+
+    def complement(self):
+        """ Returns the complement of the polygon. """
+        internal_point = self.find_internal_point()
+        return Polygon(self.vertices, internal_point)
+
     def __repr__(self):
         return "<sphere.Polygon %s without %s>" % (
                     self.vertices, self.external_point)
@@ -543,3 +605,28 @@ def cross_product(point1, point2):
 def scalar_triple_product(point1, point2, point3):
     """ Returns the scalar triple product of the three points. """
     return scalar_product(cross_product(point1, point2),  point3)
+
+
+north_pole = Point(0, 0, 1)
+south_pole = Point(0, 0, -1)
+equator = GreatCircle(north_pole)
+eq0 = Point(1, 0, 0)
+eq90 = Point(0, 1, 0)
+eq180 = Point(-1, 0, 0)
+eq270 = Point(0, -1, 0)
+
+quadrant_n1 = Polygon([north_pole, eq0, eq90], south_pole)
+quadrant_n2 = Polygon([north_pole, eq90, eq180], south_pole)
+quadrant_n3 = Polygon([north_pole, eq180, eq270], south_pole)
+quadrant_n4 = Polygon([north_pole, eq270, eq0], south_pole)
+quadrant_s1 = Polygon([south_pole, eq0, eq90], north_pole)
+quadrant_s2 = Polygon([south_pole, eq90, eq180], north_pole)
+quadrant_s3 = Polygon([south_pole, eq180, eq270], north_pole)
+quadrant_s4 = Polygon([south_pole, eq270, eq0], north_pole)
+
+northern_hemisphere = Region([quadrant_n1, quadrant_n2,
+                              quadrant_n3, quadrant_n4])
+southern_hemisphere = Region([quadrant_s1, quadrant_s2,
+                              quadrant_s3, quadrant_s4])
+full_sphere = Region([quadrant_n1, quadrant_n2, quadrant_n3, quadrant_n4,
+                      quadrant_s1, quadrant_s2, quadrant_s3, quadrant_s4])
