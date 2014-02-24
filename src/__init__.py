@@ -194,6 +194,7 @@ class Polygon:
             assert ok
             previous_point = first_point
             # (IV.3) Now, walk.
+            # TODO beautify code a bit
             while True:
                 vertices.append(previous_point)
                 # TODO improve performance
