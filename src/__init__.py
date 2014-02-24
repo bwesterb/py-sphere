@@ -113,9 +113,7 @@ class Polygon:
                                 else 1)
             other2_vertices.append(other.segments[i].point1)
             other2_vertices.extend(other_new_points[i])
-        # (II.4) Create the polygon objects and point to segment look-up-tables
-        #self2 = Polygon(self2_vertices, self.external_point)
-        #other2 = Polygon(other2_vertices, other.external_point)
+        # (II.4) Create the point to segment look-up-tables
         point_to_self2 = {}
         point_to_other2 = {}
         for i, point in enumerate(self2_vertices):
@@ -124,19 +122,141 @@ class Polygon:
             point_to_other2[point] = i
         # (III) Now, walk over the edges of this polygon and check at which
         #    intersection points the other polygon actually crosses this one.
-        for i in xrange(len(self2_vertices)):
+        crossing_points = set()
+        previously_outside = False
+        previously_inside = False
+        for i in xrange(len(self2_vertices) + 1):
+            i = i % len(self2_vertices)
             if self2_vertices[i] not in intersection_points:
                 continue
+            next_segment = Segment(self2_vertices[i],
+                    self2_vertices[(i + 1) % len(self2_vertices)])
+            point = next_segment.get_center()
+            # TODO faster lookup with point_to_other2
+            if other.border_contains(point):
+                continue
+            # TODO unify these two cases
+            if other.contains(point, assume_not_on_border=True):
+                # First case: we're going inside the other polygon
+                if previously_inside:
+                    continue
+                if not previously_outside:
+                    previously_inside = True
+                    continue
+                crossing_points.add(self2_vertices[i])
+                previously_inside = True
+                previously_outside = False
+                continue
+            # The other case: we're going outside the other polygon
+            if previously_outside:
+                continue
+            if not previously_inside:
+                previously_outside = True
+                continue
+            crossing_points.add(self2_vertices[i])
+            previously_inside = False
+            previously_outside = True
+        # (IV) Now, extract each polygon of the intersection
+        ret = []
+        while crossing_points:
+            vertices = []
+            # (IV.1) Pick a new crossing point we did not consider yet.
+            first_point = crossing_points.pop()
+            # (IV.2) Find the polygon and direction on that polygon to walk,
+            # such that we enter the intersection.
+            # TODO unify code for the two cases.
+            ok = False
+            self_direction = 0
+            other_direction = 0
+            for direction in (1, -1):
+                probe = Segment(self2_vertices[point_to_self2[first_point]],
+                        self2_vertices[(point_to_self2[first_point] + direction)
+                                % len(self2_vertices)]).get_center()
+                if (not other.border_contains(probe)
+                        and other.contains(probe, assume_not_on_border=True)):
+                    on_self = True
+                    ok = True
+                    self_direction = direction
+                    break
+            if not ok:
+                for direction in (1, -1):
+                    probe = Segment(other2_vertices[point_to_other2[
+                                    first_point]],
+                            other2_vertices[(point_to_other2[first_point]
+                                        + direction)
+                                    % len(other2_vertices)]).get_center()
+                    if (not self.border_contains(probe)
+                            and self.contains(probe, assume_not_on_border=True)):
+                        on_self = False
+                        other_direction = direction
+                        ok = True
+                        break
+            assert ok
+            previous_point = first_point
+            # (IV.3) Now, walk.
+            while True:
+                vertices.append(previous_point)
+                # TODO improve performance
+                if on_self:
+                    if self_direction == 0:
+                        # TODO improve performance
+                        ok = False
+                        for self_direction in (1, -1):
+                            probe = Segment(self2_vertices[point_to_self2[
+                                            previous_point]], self2_vertices[(
+                                    point_to_self2[previous_point]
+                                                + self_direction)
+                                            % len(self2_vertices)]).get_center()
+                            if (not other.border_contains(probe)
+                                    and other.contains(probe,
+                                        assume_not_on_border=True)):
+                                ok = True
+                                break
+                        assert ok
+                    next_point = self2_vertices[(point_to_self2[previous_point]
+                                    + self_direction) % len(self2_vertices)]
+                else:
+                    if other_direction == 0:
+                        ok = False
+                        for other_direction in (1, -1):
+                            probe = Segment(other2_vertices[point_to_other2[
+                                            previous_point]], other2_vertices[(
+                                    point_to_other2[previous_point]
+                                                + other_direction)
+                                            % len(other2_vertices)]).get_center()
+                            if (not self.border_contains(probe)
+                                    and self.contains(probe,
+                                        assume_not_on_border=True)):
+                                ok = True
+                                break
+                        assert ok
+                    next_point = other2_vertices[(point_to_other2[
+                                            previous_point] + other_direction)
+                                            % len(other2_vertices)]
+                if next_point == first_point:
+                    # Done!
+                    break
+                if next_point in crossing_points:
+                    crossing_points.remove(next_point)
+                    on_self = not on_self
+                previous_point = next_point
+            ret.append(Polygon(vertices, self.external_point))
+        return ret
 
-        
-
-    def contains(self, point):
-        """ Checks whether the polygon contains the given point. """
-        # TODO prevent iteration over every segment.  Bounding box?
-        # First check whether the point is on one of the segments.
+    def border_contains(self, point):
+        """ Checks whether the border of the polygon contains the given
+            point. """
         for segment in self.segments:
             if segment.contains(point):
                 return True
+        return False
+
+    def contains(self, point, assume_not_on_border=False):
+        """ Checks whether the polygon contains the given point. """
+        # TODO prevent iteration over every segment.  Bounding box?
+        # First check whether the point is on one of the segments.
+        if not assume_not_on_border and self.border_contains(point):
+            return True
         # Or is the fixed external point.
         if point == self.external_point:
             return False
@@ -317,7 +437,9 @@ class Point:
         return "(%s, %s, %s)" % (self.x, self.y, self.z)
 
     def __repr__(self):
-        return "<sphere.Point (%s %s %s)>" % (self.x, self.y, self.z)
+        return "<sphere.Point long %.1f lat %.1f>" % (
+                        self.longitude / math.pi * 180,
+                        self.latitude / math.pi * 180)
 
     def _get_norm(self):
         """ Returns the norm of the internal representative.
