@@ -72,6 +72,18 @@ class Polygon:
                 try:
                     intersection_point = self_seg.intersection(other_seg)
                 except SameGreatCircle:
+                    for point in (other_seg.point1, other_seg.point2):
+                        if not self_seg.contains(point, True):
+                            continue
+                        if self_seg.is_endpoint(point):
+                            continue
+                        self_new_points[self_seg_i].add(point)
+                    for point in (self_seg.point1, self_seg.point2):
+                        if not other_seg.contains(point, True):
+                            continue
+                        if other_seg.is_endpoint(point):
+                            continue
+                        other_new_points[other_seg_i].add(point)
                     continue
                 if intersection_point is None:
                     continue
@@ -102,24 +114,19 @@ class Polygon:
             other2_vertices.append(other.segments[i].point1)
             other2_vertices.extend(other_new_points[i])
         # (II.4) Create the polygon objects and point to segment look-up-tables
-        self2 = Polygon(self2_vertices, self.external_point)
-        other2 = Polygon(other2_vertices, other.external_point)
+        #self2 = Polygon(self2_vertices, self.external_point)
+        #other2 = Polygon(other2_vertices, other.external_point)
         point_to_self2 = {}
         point_to_other2 = {}
         for i, point in enumerate(self2_vertices):
             point_to_self2[point] = i
         for i, point in enumerate(other2_vertices):
             point_to_other2[point] = i
-        # (III) Now, extract the intersection polygons
-        while intersection_points:
-            # (III.1) first, pick an intersection point not yet extracted
-            point = intersection_points.pop()
-            i = point_to_self2[point]
-            # (III.2) trace back to a point outside the polygon
-            while other.contains(self2_vertices[i]):
-                i = (i - 1) % len(self2_vertices)
-            i = (i + 1) % len(self2_vertices)
-            on_self = True
+        # (III) Now, walk over the edges of this polygon and check at which
+        #    intersection points the other polygon actually crosses this one.
+        for i in xrange(len(self2_vertices)):
+            if self2_vertices[i] not in intersection_points:
+                continue
 
         
 
