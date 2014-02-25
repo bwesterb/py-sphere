@@ -2,6 +2,9 @@
 import math
 import random
 
+import numpy
+import numpy.linalg
+
 def sign(x):
     """ Returns 0 if x is zero.  1 if x is strictly positive.  -1, otherwise,
         when x is strictly negative. """
@@ -463,6 +466,24 @@ class Segment:
         if self.contains(p) and other.contains(p):
             return p
         return None
+
+    def points_in_between(self, step):
+        circle = self.get_greatcircle()
+        arc1 = circle.angle_of(self.point1)
+        arc2 = circle.angle_of(self.point2)
+        diff = (arc2 - arc1) % (2 * math.pi)
+        opposite = False
+        if diff > math.pi:
+            diff = 2 * math.pi - diff
+            opposite = True
+        steps = int(math.floor(diff / step))
+        arc = arc1
+        ret = []
+        for i in xrange(steps):
+            arc += step
+            ret.append(circle.point_at(arc))
+        return ret
+
     def get_center(self):
         """ Returns the center point of the segment. """
         return Point(self.point1.x + self.point2.x,
@@ -484,6 +505,11 @@ class GreatCircle:
         """ Creates a great circle given by the normal point of the
             plane it determines. """
         self.normal = normal
+
+        # Linear transformations from greatcircle to the sphere and back.
+        # Created by _generate_matrices.
+        self._from_circle = None
+        self._to_circle = None
     @staticmethod
     def through(point1, point2):
         """ Returns the great circle that goes through the given
@@ -498,6 +524,32 @@ class GreatCircle:
         if self == other:
             raise SameGreatCircle
         return cross_product(self.normal, other.normal)
+    def _generate_matrices(self):
+        if self._from_circle is not None:
+            return
+        # First, normalize the great circle normal
+        normal = self.normal
+        if normal.z < 0:
+            normal = -normal
+        if normal.z == 0:
+            if normal.x < 0:
+                normal = -normal
+        # Now, find the "canonical" orthogonal basis
+        basis = orthonormal_basis_for(normal)
+        self._from_circle = numpy.matrix([
+                v._get_normalized_tuple() for v in basis]).T
+        self._to_circle = numpy.linalg.inv(self._from_circle)
+    def angle_of(self, point):
+        """ Gets the angle of a point on this Great Circle. """
+        self._generate_matrices()
+        vec = self._to_circle * numpy.matrix(point._get_normalized_tuple()).T
+        return math.atan2(vec[1], vec[2])
+    def point_at(self, angle):
+        """ Return the point on this great circle at the given angle. """
+        self._generate_matrices()
+        return Point(*map(float, self._from_circle * numpy.matrix(
+                            [0, math.sin(angle), math.cos(angle)]).T))
+
     def __repr__(self):
         return "<sphere.GreatCircle %s>" % self.normal
 
@@ -547,7 +599,8 @@ class Point:
             origin as the other point.  Or equivalently: whether this
             point is equal or antipodal to the other. """
         return (self.x * other.y == self.y * other.x and
-                self.y * other.z == self.z * other.y)
+                self.y * other.z == self.z * other.y and
+                self.x * other.z == self.z * other.x)
     @property
     def longitude(self):
         """ Returns the longitude of the point. """
@@ -608,6 +661,40 @@ def scalar_triple_product(point1, point2, point3):
     """ Returns the scalar triple product of the three points. """
     return scalar_product(cross_product(point1, point2),  point3)
 
+def orthonormal_basis_for(point):
+    """ Deterministicly returns a orthonormal basis containing the point. """
+    # First, find a basis.
+    if not c_xy.contains(point):
+        basis = [point, e_x, e_y]
+    elif not c_yz.contains(point):
+        basis = [point, e_y, e_z]
+    else:
+        basis = [point, e_x, e_z]
+    # Now, orthogonalize
+    return grahm_schmidt(basis)
+
+def grahm_schmidt(basis):
+    """ Returns basis into an orthonormal basis. """
+    ret = []
+    for v in basis:
+        x, y, z = v.x, v.y, v.z
+        for orth_vector in ret:
+            factor = (scalar_product(v, orth_vector) * scalar_product(v, v)
+                            / scalar_product(orth_vector, orth_vector))
+            x -= factor * orth_vector.x
+            y -= factor * orth_vector.y
+            z -= factor * orth_vector.z
+            assert Point(x, y, z).orthogonal_to(orth_vector)
+        ret.append(Point(x, y, z))
+    return ret
+
+e_x = Point(1, 0, 0)
+e_y = Point(0, 1, 0)
+e_z = Point(0, 0, 1)
+
+c_xy = GreatCircle.through(e_x, e_y)
+c_yz = GreatCircle.through(e_y, e_z)
+c_xz = GreatCircle.through(e_x, e_z)
 
 north_pole = Point(0, 0, 1)
 south_pole = Point(0, 0, -1)

@@ -17,6 +17,8 @@ class TestCore(unittest.TestCase):
         self.p6 = sphere.Point(F(1), F(2), F(2))
         self.p7 = sphere.Point(F(-1), F(2), F(2))
         self.p8 = sphere.Point(F(1), F(-1, 10), F(2))
+        self.points = [self.p1, self.p2, self.p3, self.p4, self.p5, self.p6,
+                       self.p6, self.p8]
         self.seg1 = sphere.Segment(self.p1, self.p2)
         self.seg2 = sphere.Segment(self.p3, self.p4)
         self.seg3 = sphere.Segment(self.p4, self.p5)
@@ -85,6 +87,8 @@ class TestCore(unittest.TestCase):
         self.assertEqual(len(ret), 1)
         self.assertEqual(ret[0],
                         sphere.Polygon([self.p2, self.p3, self.p4], self.p1))
+        ret = self.poly1.complement().intersection(self.poly2.complement())
+        #print ret
     def test_internal_point(self):
         internal_point1 = self.poly1.find_internal_point()
         internal_point2 = self.poly2.find_internal_point()
@@ -92,6 +96,37 @@ class TestCore(unittest.TestCase):
         self.assertTrue(self.poly2.contains(internal_point2))
         self.assertFalse(self.poly1.border_contains(internal_point1))
         self.assertFalse(self.poly2.border_contains(internal_point2))
+    def test_union(self):
+        ret = self.poly1.union(self.poly2)
+        #print ret
+        #import sphere.viewer
+        #sphere.viewer.view([self.poly1,
+        #                    self.poly2])
+    def test_collinear(self):
+        self.assertTrue(sphere.e_z.collinear(sphere.e_z))
+        self.assertTrue(sphere.e_z.collinear(-sphere.e_z))
+        self.assertFalse(sphere.e_z.collinear(sphere.e_x))
+        self.assertFalse(sphere.e_z.collinear(-sphere.e_x))
+    def test_orthonormal_basis_for(self):
+        for point in self.points:
+            basis = sphere.orthonormal_basis_for(point)
+            self.assertEqual(basis[0], point)
+            self.assertTrue(basis[1].orthogonal_to(basis[0]))
+            self.assertTrue(basis[1].orthogonal_to(basis[2]))
+            self.assertTrue(basis[0].orthogonal_to(basis[2]))
+    def test_angle_of(self):
+        self.assertTrue(close(0,
+            self.c1.point_at(self.c1.angle_of(self.p1)).distance_to(self.p1)))
+        self.assertTrue(close(0,
+            self.c1.point_at(self.c1.angle_of(self.p2)).distance_to(self.p2)))
+        self.assertTrue(close(0,
+            self.c2.point_at(self.c2.angle_of(self.p1)).distance_to(self.p1)))
+        self.assertTrue(close(0,
+            self.c2.point_at(self.c2.angle_of(self.p3)).distance_to(self.p3)))
+        self.assertTrue(close(0,
+            self.c3.point_at(self.c3.angle_of(self.p1)).distance_to(self.p1)))
+        self.assertTrue(close(0,
+            self.c3.point_at(self.c3.angle_of(self.p4)).distance_to(self.p4)))
 
 if __name__ == '__main__':
     unittest.main()
