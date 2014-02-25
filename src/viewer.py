@@ -48,20 +48,57 @@ class Viewer:
         return colorsys.hls_to_rgb((color_index * COLOR_ANGLE) % 1.0, 0.5, 1.0)
 
     def add_point(self, point):
-        self.points.append(point)
+        self.points.append((point, self.next_color()))
     def add_circle(self, circle):
-        self.circles.append(circle)
+        self.circles.append((circle, self.next_color()))
     def add_polygon(self, polygon):
-        self.polygons.append(polygon)
+        self.polygons.append((polygon, self.next_color()))
     def add_segment(self, segment):
-        self.segments.append(segment)
+        self.segments.append((segment, self.next_color()))
+
+    def _display_point(self, point, color):
+        GL.glBegin(GL.GL_POINTS)
+        GL.glColor4f(color[0], color[1], color[2], 1)
+        GL.glVertex3f(*point._get_normalized_tuple())
+        GL.glEnd()
+
+    def _display_segment(self, segment, color):
+        GL.glColor4f(color[0], color[1], color[2], 1)
+        GL.glBegin(GL.GL_POINTS)
+        GL.glVertex3f(*segment.point1._get_normalized_tuple())
+        GL.glVertex3f(*segment.point2._get_normalized_tuple())
+        GL.glEnd()
+        GL.glBegin(GL.GL_LINE_STRIP)
+        GL.glVertex3f(*segment.point1._get_normalized_tuple())
+        for point in segment.points_in_between(0.1):
+            GL.glVertex3f(*point._get_normalized_tuple())
+        GL.glVertex3f(*segment.point2._get_normalized_tuple())
+        GL.glEnd()
+
+    def display_segments(self):
+        GL.glPointSize(4);
+        GL.glLineWidth(2);
+        GL.glDisable(GL.GL_LIGHTING)
+        for segment, color in self.segments:
+            self._display_segment(segment, color)
+        GL.glEnable(GL.GL_LIGHTING)
+
+    def display_points(self):
+        GL.glPointSize(4);
+        GL.glDisable(GL.GL_LIGHTING)
+        for point, color in self.points:
+            self._display_point(point, color)
+        GL.glEnable(GL.GL_LIGHTING)
 
     def display_sphere(self):
+        GL.glPointSize(1);
+        GL.glLineWidth(0.5);
         GL.glMaterialfv(GL.GL_FRONT, GL.GL_DIFFUSE, [1, 1, 1, 0.5])
-        GLUT.glutWireSphere(0.94, 20, 20)
-        GLUT.glutSolidSphere(0.95, 20, 20)
+        GLUT.glutWireSphere(0.97, 20, 20)
+        GLUT.glutSolidSphere(0.98, 20, 20)
 
     def display_box(self):
+        GL.glLineWidth(2);
         GL.glDisable(GL.GL_LIGHTING)
         GL.glColor4f(1, 0, 0, 1)
         GL.glBegin(GL.GL_LINE_STRIP)
@@ -122,6 +159,8 @@ class Viewer:
         print cam_x, cam_y, cam_z
 
         self.display_box()
+        self.display_points()
+        self.display_segments()
         self.display_sphere()
 
         GL.glPopMatrix()
@@ -171,3 +210,9 @@ class Viewer:
         GLUT.glutWMCloseFunc(self.close)
 
         GLUT.glutMainLoop()
+
+if __name__ == '__main__':
+    view([
+        sphere.Segment(sphere.Point(1,0,0),
+                        sphere.Point(0,0,1))
+        ])

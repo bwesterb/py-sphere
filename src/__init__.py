@@ -477,10 +477,13 @@ class Segment:
             diff = 2 * math.pi - diff
             opposite = True
         steps = int(math.floor(diff / step))
-        arc = arc1
+        arc = arc2 if opposite else arc1
         ret = []
         for i in xrange(steps):
-            arc += step
+            if opposite:
+                arc += step
+            else:
+                arc -= step
             ret.append(circle.point_at(arc))
         return ret
 
