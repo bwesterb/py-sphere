@@ -38,8 +38,13 @@ class Region:
 
     def complement(self):
         """ Returns the complement of this region. """
-        ret = full_sphere
+        if not self.polygons:
+            return full_sphere
+        ret = None
         for poly in self.polygons:
+            if ret is None:
+                ret = Region([poly.complement()])
+                continue
             ret = ret.intersection(Region([poly.complement()]))
         return ret
 
@@ -507,9 +512,6 @@ class Point:
         """ Creates a point by its unnormalized 3D coordinates """
         assert x != 0 or y != 0 or z != 0
         self.x, self.y, self.z = x, y, z
-
-    def __str__(self):
-        return "(%s, %s, %s)" % (self.x, self.y, self.z)
 
     def __repr__(self):
         return "<sphere.Point long %.1f lat %.1f>" % (
