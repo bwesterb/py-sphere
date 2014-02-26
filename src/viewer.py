@@ -36,6 +36,7 @@ class Viewer:
         self.running = False
 
         self.zoom = 4.0
+        self.explosion = 0.01
         self.cam_long = 0.0
         self.cam_lat = .5 * math.pi
 
@@ -44,10 +45,11 @@ class Viewer:
         self.n_colors = 0
 
     def next_color(self):
-        """ Returns the next free color. """
+        """ Returns the next free color together with its number """
         color_index = self.n_colors
         self.n_colors += 1
-        return colorsys.hls_to_rgb((color_index * COLOR_ANGLE) % 1.0, 0.5, 1.0)
+        return (colorsys.hls_to_rgb((color_index * COLOR_ANGLE) % 1.0, 0.5, 1.0)
+                    + (color_index,))
 
     def add_point(self, point):
         self.points.append((point, self.next_color()))
@@ -59,12 +61,19 @@ class Viewer:
         self.segments.append((segment, self.next_color()))
 
     def _display_point(self, point, color):
+        GL.glPushMatrix()
+        scale_factor = 1.0 + self.explosion * color[3]
+        GL.glScalef(scale_factor, scale_factor, scale_factor)
         GL.glBegin(GL.GL_POINTS)
         GL.glColor4f(color[0], color[1], color[2], 1)
         GL.glVertex3f(*point._get_normalized_tuple())
         GL.glEnd()
+        GL.glPopMatrix()
 
     def _display_circle(self, circle, color):
+        GL.glPushMatrix()
+        scale_factor = 1.0 + self.explosion * color[3]
+        GL.glScalef(scale_factor, scale_factor, scale_factor)
         GL.glColor4f(color[0], color[1], color[2], 1)
         GL.glBegin(GL.GL_LINE_LOOP)
         for segment in circle.get_quadrants():
@@ -72,8 +81,12 @@ class Viewer:
             for point in segment.points_in_between(0.1):
                 GL.glVertex3f(*point._get_normalized_tuple())
         GL.glEnd()
+        GL.glPopMatrix()
 
     def _display_polygon(self, polygon, color):
+        GL.glPushMatrix()
+        scale_factor = 1.0 + self.explosion * color[3]
+        GL.glScalef(scale_factor, scale_factor, scale_factor)
         GL.glColor4f(color[0], color[1], color[2], 1)
         for segment in polygon.segments:
             GL.glBegin(GL.GL_POINTS)
@@ -85,8 +98,12 @@ class Viewer:
                 GL.glVertex3f(*point._get_normalized_tuple())
             GL.glVertex3f(*segment.point2._get_normalized_tuple())
             GL.glEnd()
+        GL.glPopMatrix()
 
     def _display_segment(self, segment, color):
+        GL.glPushMatrix()
+        scale_factor = 1.0 + self.explosion * color[3]
+        GL.glScalef(scale_factor, scale_factor, scale_factor)
         GL.glColor4f(color[0], color[1], color[2], 1)
         GL.glBegin(GL.GL_POINTS)
         GL.glVertex3f(*segment.point1._get_normalized_tuple())
@@ -98,6 +115,7 @@ class Viewer:
             GL.glVertex3f(*point._get_normalized_tuple())
         GL.glVertex3f(*segment.point2._get_normalized_tuple())
         GL.glEnd()
+        GL.glPopMatrix()
 
     def display_circles(self):
         GL.glPointSize(4);
@@ -200,6 +218,10 @@ class Viewer:
         elif key == 'F':
             self.zoom -= 0.3
             redraw = True
+        elif key == 't':
+            self.explosion += 0.01
+        elif key == 'g':
+            self.explosion -= 0.01
         else:
             print 'unknown key', key
         if redraw:
