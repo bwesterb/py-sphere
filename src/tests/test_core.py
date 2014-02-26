@@ -32,6 +32,7 @@ class TestCore(unittest.TestCase):
                                         self.p5)
         self.poly2 = sphere.Polygon([self.p3, self.p4, self.p5],
                                         -self.p5)
+        self.polys = [self.poly1, self.poly2]
     def test_point_distance(self):
         self.assertEqual(self.p1.distance_to(self.p2), math.sqrt(2))
         self.assertEqual(self.p1.distance_to(self.p1), 0)
@@ -88,8 +89,7 @@ class TestCore(unittest.TestCase):
         self.assertEqual(len(ret), 1)
         self.assertEqual(ret[0],
                         sphere.Polygon([self.p2, self.p3, self.p4], self.p1))
-        ret = self.poly1.complement().intersection(self.poly2.complement())
-        #print ret
+
     def test_internal_point(self):
         internal_point1 = self.poly1.find_internal_point()
         internal_point2 = self.poly2.find_internal_point()
@@ -98,11 +98,8 @@ class TestCore(unittest.TestCase):
         self.assertFalse(self.poly1.border_contains(internal_point1))
         self.assertFalse(self.poly2.border_contains(internal_point2))
     def test_union(self):
-        ret = self.poly1.union(self.poly2)
-        #print ret
-        #import sphere.viewer
-        #sphere.viewer.view([self.poly1,
-        #                    self.poly2])
+        ret = self.poly1.intersection(self.poly2)
+        # TODO add test
     def test_collinear(self):
         self.assertTrue(sphere.e_z.collinear(sphere.e_z))
         self.assertTrue(sphere.e_z.collinear(-sphere.e_z))
@@ -128,6 +125,12 @@ class TestCore(unittest.TestCase):
             self.c3.point_at(self.c3.angle_of(self.p1)).distance_to(self.p1)))
         self.assertTrue(close(0,
             self.c3.point_at(self.c3.angle_of(self.p4)).distance_to(self.p4)))
+    def test_open_split(self):
+        import sphere.viewer
+        import itertools
+        polys = self.poly1.open_split()
+        polys = list(itertools.chain(*[x.open_split() for x in polys]))
+        sphere.viewer.view(polys)
 
 if __name__ == '__main__':
     unittest.main()

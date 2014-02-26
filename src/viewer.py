@@ -220,8 +220,10 @@ class Viewer:
             redraw = True
         elif key == 't':
             self.explosion += 0.01
+            redraw = True
         elif key == 'g':
             self.explosion -= 0.01
+            redraw = True
         else:
             print 'unknown key', key
         if redraw:

@@ -20,6 +20,8 @@ class SameGreatCircle(Error):
     pass
 class DegeneratePolygon(Error):
     pass
+class CouldNotSplitThere(Error):
+    pass
 
 class Region:
     """ A union of (open) disjoint polygons. """
@@ -50,6 +52,15 @@ class Region:
                 continue
             ret = ret.intersection(Region([poly.complement()]))
         return ret
+
+    def open_split(self):
+        """ Splits this region into two regions such that the union of
+            their interior is the union of the interior of this region. """
+        if not self.polygons:
+            return []
+        if len(self.polygons) > 1:
+            return (Region([self.polygons[0]]), Region(self.polygons[1:]))
+        return Region(self.polygons[0].open_split())
 
     def __repr__(self):
         return '<Region %s>' % self.polygons
@@ -397,6 +408,54 @@ class Polygon:
         internal_point = self.find_internal_point()
         return Polygon(self.vertices, internal_point)
 
+    def open_split(self):
+        """ Split this polygon into two polygons with overlap such that
+            the union of the interior of the two polygons equals the
+            interior of this polyogn. """
+        # TODO be smarter about splitting: preferably we find the split
+        # such that the area is roughly split in two.
+        lengths = [(i, self.segments[i].get_tunnel_length()) for i
+                    in xrange(len(self.segments))]
+        lengths.sort(key=lambda x: -x[1])
+        i = lengths[0][0]
+        #try:
+        return self._try_open_split_at(i, (i + len(self.segments)/2)
+                                                    % len(self.segments))
+        #except CouldNotSplitThere:
+        #    pass
+        for i in xrange(len(self.segments)):
+            try:
+                return self._try_open_split_at(i, (i+1) % len(self.segments))
+            except CouldNotSplitThere:
+                pass
+
+    def _try_open_split_at(self, i1, i2):
+        if i2 < i1:
+            i2, i1 = i1, i2
+        segment1 = self.segments[i1]
+        segment2 = self.segments[i2]
+        p1 = segment1.point_in_between(49, 100)
+        p2 = segment1.point_in_between(51, 100)
+        p3 = segment2.point_in_between(49, 100)
+        p4 = segment2.point_in_between(51, 100)
+        new_segment1 = Segment(p1, p4)
+        new_segment2 = Segment(p2, p3)
+        # Now check whether the split is ok.
+        # TODO increase performance
+        if new_segment1.intersection(new_segment2) is not None:
+            raise CouldNotSplitThere
+        for i in xrange(len(self.segments)):
+            if i in (i1, i2):
+                continue
+            if new_segment1.intersection(self.segments[i]) is not None:
+                raise CouldNotSplitThere
+            if new_segment2.intersection(self.segments[i]) is not None:
+                raise CouldNotSplitThere
+        return [Polygon(self.vertices[i1:i2] + [p3, p2],
+                            self.external_point),
+                Polygon(self.vertices[:i1] + [p1, p4] + self.vertices[i2:],
+                            self.external_point)]
+
     def __repr__(self):
         return "<sphere.Polygon %s without %s>" % (
                     self.vertices, self.external_point)
@@ -423,6 +482,10 @@ class Segment:
         """ Creates a segment by its endpoints. """
         self.point1 = point1
         self.point2 = point2
+
+    def get_tunnel_length(self):
+        """ Returns the distance between the endpoints. """
+        return self.point1.distance_to(self.point2)
 
     def get_arc(self):
         """ Returns the arc in radians covered by the segment. """
@@ -487,11 +550,19 @@ class Segment:
             ret.append(circle.point_at(arc))
         return ret
 
+    def point_in_between(self, num, denom):
+        """ Gets the point that is num/denom way between the two endpoints. """
+        x1, y1, z1 = self.point1._get_normalized_tuple()
+        x2, y2, z2 = self.point2._get_normalized_tuple()
+        return Point(num * x1 + (denom - num) * x2,
+                     num * y1 + (denom - num) * y2,
+                     num * z1 + (denom - num) * z2)
+
     def get_center(self):
         """ Returns the center point of the segment. """
-        return Point(self.point1.x + self.point2.x,
-                     self.point1.y + self.point2.y,
-                     self.point1.z + self.point2.z)
+        x1, y1, z1 = self.point1._get_normalized_tuple()
+        x2, y2, z2 = self.point2._get_normalized_tuple()
+        return Point(x1 + x2, y1 + y2, z1 + z2)
     def __eq__(self, other):
         return ((self.point1, self.point2) == (other.point1, other.point2) or
                 (self.point1, self.point2) == (other.point2, other.point1))
@@ -605,7 +676,10 @@ class Point:
         return math.sqrt(self.squared_distance_to(other))
     def orthogonal_to(self, other):
         """ Returns whether this point is orthogonal to other. """
-        return scalar_product(self, other) == 0
+        scalar = scalar_product(self, other)
+        if isinstance(scalar, float):
+            return abs(scalar) < 1e-10
+        return scalar == 0
     def collinear(self, other):
         """ Checks whether this point is on the same line through the
             origin as the other point.  Or equivalently: whether this
