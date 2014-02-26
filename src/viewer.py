@@ -39,6 +39,8 @@ class Viewer:
         self.cam_long = 0.0
         self.cam_lat = .5 * math.pi
 
+        self.rotating = True
+
         self.n_colors = 0
 
     def next_color(self):
@@ -62,6 +64,28 @@ class Viewer:
         GL.glVertex3f(*point._get_normalized_tuple())
         GL.glEnd()
 
+    def _display_circle(self, circle, color):
+        GL.glColor4f(color[0], color[1], color[2], 1)
+        GL.glBegin(GL.GL_LINE_LOOP)
+        for segment in circle.get_quadrants():
+            GL.glVertex3f(*segment.point1._get_normalized_tuple())
+            for point in segment.points_in_between(0.1):
+                GL.glVertex3f(*point._get_normalized_tuple())
+        GL.glEnd()
+
+    def _display_polygon(self, polygon, color):
+        GL.glColor4f(color[0], color[1], color[2], 1)
+        for segment in polygon.segments:
+            GL.glBegin(GL.GL_POINTS)
+            GL.glVertex3f(*segment.point1._get_normalized_tuple())
+            GL.glEnd()
+            GL.glBegin(GL.GL_LINE_STRIP)
+            GL.glVertex3f(*segment.point1._get_normalized_tuple())
+            for point in segment.points_in_between(0.1):
+                GL.glVertex3f(*point._get_normalized_tuple())
+            GL.glVertex3f(*segment.point2._get_normalized_tuple())
+            GL.glEnd()
+
     def _display_segment(self, segment, color):
         GL.glColor4f(color[0], color[1], color[2], 1)
         GL.glBegin(GL.GL_POINTS)
@@ -74,6 +98,14 @@ class Viewer:
             GL.glVertex3f(*point._get_normalized_tuple())
         GL.glVertex3f(*segment.point2._get_normalized_tuple())
         GL.glEnd()
+
+    def display_circles(self):
+        GL.glPointSize(4);
+        GL.glLineWidth(2);
+        GL.glDisable(GL.GL_LIGHTING)
+        for circle, color in self.circles:
+            self._display_circle(circle, color)
+        GL.glEnable(GL.GL_LIGHTING)
 
     def display_segments(self):
         GL.glPointSize(4);
@@ -90,11 +122,20 @@ class Viewer:
             self._display_point(point, color)
         GL.glEnable(GL.GL_LIGHTING)
 
+    def display_polygons(self):
+        GL.glPointSize(4);
+        GL.glLineWidth(2);
+        GL.glDisable(GL.GL_LIGHTING)
+        for polygon, color in self.polygons:
+            self._display_polygon(polygon, color)
+        GL.glEnable(GL.GL_LIGHTING)
+
     def display_sphere(self):
         GL.glPointSize(1);
         GL.glLineWidth(0.5);
-        GL.glMaterialfv(GL.GL_FRONT, GL.GL_DIFFUSE, [1, 1, 1, 0.5])
+        GL.glMaterialfv(GL.GL_FRONT, GL.GL_DIFFUSE, [1, 1, 1, 0.1])
         GLUT.glutWireSphere(0.97, 20, 20)
+        GL.glMaterialfv(GL.GL_FRONT, GL.GL_DIFFUSE, [1, 1, 1, 0.5])
         GLUT.glutSolidSphere(0.98, 20, 20)
 
     def display_box(self):
@@ -121,23 +162,43 @@ class Viewer:
         redraw = False
         if key == 'q':
             self.close()
+        elif key == 'e':
+            self.rotating = not self.rotating
         elif key == 'w':
             self.cam_lat += 0.1
+            redraw = True
+        elif key == 'W':
+            self.cam_lat += 0.3
             redraw = True
         elif key == 's':
             self.cam_lat -= 0.1
             redraw = True
+        elif key == 'S':
+            self.cam_lat -= 0.3
+            redraw = True
         elif key == 'a':
             self.cam_long -= 0.1
+            redraw = True
+        elif key == 'A':
+            self.cam_long -= 0.3
             redraw = True
         elif key == 'd':
             self.cam_long += 0.1
             redraw = True
+        elif key == 'D':
+            self.cam_long += 0.3
+            redraw = True
         elif key == 'r':
             self.zoom += 0.1
             redraw = True
+        elif key == 'R':
+            self.zoom += 0.3
+            redraw = True
         elif key == 'f':
             self.zoom -= 0.1
+            redraw = True
+        elif key == 'F':
+            self.zoom -= 0.3
             redraw = True
         else:
             print 'unknown key', key
@@ -156,17 +217,25 @@ class Viewer:
         cam_y = self.zoom * math.sin(self.cam_lat) * math.sin(self.cam_long)
         cam_z = self.zoom * math.cos(self.cam_lat)
         GLU.gluLookAt(cam_x, cam_y, cam_z, 0, 0, 0, 0, 0, 2)
-        print cam_x, cam_y, cam_z
 
         self.display_box()
         self.display_points()
         self.display_segments()
+        self.display_circles()
+        self.display_polygons()
         self.display_sphere()
 
         GL.glPopMatrix()
         GLUT.glutSwapBuffers()
 
-        print 'display %.4f' % (time.time() - start)
+        render_time = time.time() - start
+        GLUT.glutSetWindowTitle("%.3f" % render_time)
+    
+    def timer(self, dummy):
+        if self.rotating:
+            self.cam_long += 0.01
+            GLUT.glutPostRedisplay()
+        GLUT.glutTimerFunc(30, self.timer, None)
 
     def close(self):
         # TODO GLUT.glutLeaveMainLoop does not always exist.  Is there a way
@@ -208,11 +277,19 @@ class Viewer:
         GLUT.glutKeyboardFunc(self.keyboard)
         GLUT.glutDisplayFunc(self.display)
         GLUT.glutWMCloseFunc(self.close)
+        GLUT.glutTimerFunc(30, self.timer, None)
 
         GLUT.glutMainLoop()
 
 if __name__ == '__main__':
-    view([
-        sphere.Segment(sphere.Point(1,0,0),
-                        sphere.Point(0,0,1))
-        ])
+    view([sphere.Polygon([
+                sphere.Point(0., 0., 1.),
+                sphere.Point(0., 1., 0.),
+                sphere.Point(2., 2., 0.)], sphere.Point(-1., -1., -1.))])
+    #view([sphere.Point(*v) for v in [
+    #    (2, 0, 0), (0, 2, 0), (0, 0, 2), (2, 0,-2), (2, 0,-1), (2, 0, 1),
+    #    (2, 0, 2), (2, 2,-2), (2, 2, 0), (-1,1, 2), (2, 2, 2), (0, 2,-2),
+    #    (0, 2,-1), (0, 2, 1), (0, 2, 2), (2,-1,-1), (2,-1, 0), (2,-1, 1),
+    #    (1, 2,-1), (1, 2, 0), (1, 2, 1), (-2,2,-2), (-2,2, 0), (-2,2, 2),
+    #    (1,-1, 2), (1, 0, 2), (1, 1, 2), (0,-1, 2), (0, 1, 2), (-1,-1,2),
+    #    (-1,0, 2)]])

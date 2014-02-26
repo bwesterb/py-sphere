@@ -553,6 +553,15 @@ class GreatCircle:
         return Point(*map(float, self._from_circle * numpy.matrix(
                             [0, math.sin(angle), math.cos(angle)]).T))
 
+    def get_quadrants(self):
+        """ Returns four segments that make up this great circle. """
+        return [Segment(self.point_at(0), self.point_at(math.pi / 2)),
+                Segment(self.point_at(math.pi / 2), self.point_at(math.pi)),
+                Segment(self.point_at(math.pi), self.point_at(3.0/2 * math.pi)),
+                Segment(self.point_at(3.0/2 * math.pi),
+                        self.point_at(2 * math.pi))]
+                    
+
     def __repr__(self):
         return "<sphere.GreatCircle %s>" % self.normal
 
