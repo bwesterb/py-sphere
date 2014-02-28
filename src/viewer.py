@@ -22,6 +22,8 @@ def view(objects):
             viewer.add_circle(obj)
         elif isinstance(obj, sphere.Polygon):
             viewer.add_polygon(obj)
+        elif isinstance(obj, sphere.Region):
+            viewer.add_region(obj)
         else:
             raise ValueError("I do not how to draw %r" % obj)
     viewer.run()
@@ -32,6 +34,7 @@ class Viewer:
         self.segments = []
         self.circles = []
         self.polygons = []
+        self.regions = []
 
         self.running = False
 
@@ -59,6 +62,8 @@ class Viewer:
         self.polygons.append((polygon, self.next_color()))
     def add_segment(self, segment):
         self.segments.append((segment, self.next_color()))
+    def add_region(self, segment):
+        self.regions.append((segment, self.next_color()))
 
     def _display_point(self, point, color):
         GL.glPushMatrix()
@@ -83,11 +88,35 @@ class Viewer:
         GL.glEnd()
         GL.glPopMatrix()
 
+    def _display_region(self, region, color):
+        GL.glPushMatrix()
+        scale_factor = 1.0 + self.explosion * color[3]
+        GL.glScalef(scale_factor, scale_factor, scale_factor)
+        GL.glColor4f(color[0], color[1], color[2], 1)
+        for polygon in region.polygons:
+            GL.glBegin(GL.GL_POINTS)
+            GL.glVertex3f(*polygon.external_point._get_normalized_tuple())
+            GL.glEnd()
+            for segment in polygon.segments:
+                GL.glBegin(GL.GL_POINTS)
+                GL.glVertex3f(*segment.point1._get_normalized_tuple())
+                GL.glEnd()
+                GL.glBegin(GL.GL_LINE_STRIP)
+                GL.glVertex3f(*segment.point1._get_normalized_tuple())
+                for point in segment.points_in_between(0.1):
+                    GL.glVertex3f(*point._get_normalized_tuple())
+                GL.glVertex3f(*segment.point2._get_normalized_tuple())
+                GL.glEnd()
+        GL.glPopMatrix()
+
     def _display_polygon(self, polygon, color):
         GL.glPushMatrix()
         scale_factor = 1.0 + self.explosion * color[3]
         GL.glScalef(scale_factor, scale_factor, scale_factor)
         GL.glColor4f(color[0], color[1], color[2], 1)
+        GL.glBegin(GL.GL_POINTS)
+        GL.glVertex3f(*polygon.external_point._get_normalized_tuple())
+        GL.glEnd()
         for segment in polygon.segments:
             GL.glBegin(GL.GL_POINTS)
             GL.glVertex3f(*segment.point1._get_normalized_tuple())
@@ -147,6 +176,15 @@ class Viewer:
         for polygon, color in self.polygons:
             self._display_polygon(polygon, color)
         GL.glEnable(GL.GL_LIGHTING)
+
+    def display_regions(self):
+        GL.glPointSize(4);
+        GL.glLineWidth(2);
+        GL.glDisable(GL.GL_LIGHTING)
+        for region, color in self.regions:
+            self._display_region(region, color)
+        GL.glEnable(GL.GL_LIGHTING)
+
 
     def display_sphere(self):
         GL.glPointSize(1);
@@ -247,6 +285,7 @@ class Viewer:
         self.display_segments()
         self.display_circles()
         self.display_polygons()
+        self.display_regions()
         self.display_sphere()
 
         GL.glPopMatrix()
