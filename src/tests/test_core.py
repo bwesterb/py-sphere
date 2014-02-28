@@ -25,6 +25,10 @@ class TestCore(unittest.TestCase):
         self.seg3 = sphere.Segment(self.p4, self.p5)
         self.seg4 = sphere.Segment(self.p2, self.p3)
         self.seg5 = sphere.Segment(self.p6, self.p7)
+        self.seg6 = sphere.Segment(sphere.Point(F(0), F(1), F(2)),
+                                   sphere.Point(F(0), F(2), F(1)))
+        self.segs = [self.seg1, self.seg2, self.seg3, self.seg4, self.seg5,
+                                self.seg6]
         self.c1 = sphere.GreatCircle.through(self.p1, self.p2)
         self.c2 = sphere.GreatCircle.through(self.p1, self.p3)
         self.c3 = sphere.GreatCircle.through(self.p1, self.p4)
@@ -126,11 +130,12 @@ class TestCore(unittest.TestCase):
         self.assertTrue(close(0,
             self.c3.point_at(self.c3.angle_of(self.p4)).distance_to(self.p4)))
     def test_open_split(self):
-        import sphere.viewer
-        import itertools
         polys = self.poly1.open_split()
-        polys = list(itertools.chain(*[x.open_split() for x in polys]))
-        sphere.viewer.view(polys)
+        # TODO add test
+    def test_northern_orthocomplement(self):
+        for seg in self.segs:
+            seg.northern_orthocomplement()
+        # TODO add test
 
 if __name__ == '__main__':
     unittest.main()

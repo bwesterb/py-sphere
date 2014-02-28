@@ -564,6 +564,61 @@ class Segment:
         x1, y1, z1 = self.point1._get_normalized_tuple()
         x2, y2, z2 = self.point2._get_normalized_tuple()
         return Point(x1 + x2, y1 + y2, z1 + z2)
+
+    def northern_orthocomplement(self):
+        """ Returns a list of polygons containing exactly the points on the
+            northern hemisphere orthogonal to any point of the segment.
+            Assumes the segment is contained in the northern hemisphere. """
+        external_point = self.get_center()
+        # TODO drop assumption
+        # We distinguish three cases:
+        #   I) One of the endpoints is the north pole.
+        #  II) Both endpoints are not the north pole and the
+        #      orthocomplement (circles) of the two points intersect on
+        #      the equator.
+        # III) Both endpoints are not the borth pole and the orthocomplement
+        #      (circles) of the two points do not intersect on the equator.
+        if self.point1 == north_pole or self.point2 == north_pole:
+            # (Case I)
+            point = self.point2 if self.point1 == north_pole else self.point1
+            point_perp = GreatCircle(point) # points orth. to point
+            p = point_perp.intersection(equator)
+            c = GreatCircle.through(point, north_pole)
+            q = c.intersection(point_perp)
+            if not q.on_northern_hemisphere:
+                q = -q
+            r = c.intersection(equator)
+            if not Segment(r, point).contains(north_pole,
+                    assume_on_greatcircle=True):
+                r = -r
+            return [Polygon([q, r, p], external_point),
+                    Polygon([q, r, -p], external_point)]
+        point1_perp = GreatCircle(self.point1)
+        point2_perp = GreatCircle(self.point2)
+        r = point1_perp.intersection(point2_perp)
+        if r.on_equator:
+            # (Case II)
+            c = GreatCircle.through(self.point1, self.point2)
+            q1 = c.intersection(point1_perp)
+            q2 = c.intersection(point2_perp)
+            if not q1.on_northern_hemisphere:
+                q1 = -q1
+            if not q2.on_northern_hemisphere:
+                q2 = -q2
+            return [Polygon([q1, q2, r], external_point),
+                    Polygon([q1, q2, -r], external_point)]
+        # (Case III)
+        q = point1_perp.intersection(equator)
+        p = point2_perp.intersection(equator)
+        t = GreatCircle(Segment(p, q).get_center()).intersection(
+                    GreatCircle.through(self.point1, self.point2))
+        if (self.contains(t, assume_on_greatcircle=True) or
+                self.contains(-t, assume_on_greatcircle=True)):
+            return [Polygon([p, q, r], external_point),
+                    Polygon([-p, -q, r], external_point)]
+        return [Polygon([p, -q, r], external_point),
+                Polygon([-p, q, r], external_point)]
+
     def __eq__(self, other):
         return ((self.point1, self.point2) == (other.point1, other.point2) or
                 (self.point1, self.point2) == (other.point2, other.point1))
