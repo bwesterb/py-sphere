@@ -133,8 +133,15 @@ class TestCore(unittest.TestCase):
         polys = self.poly1.open_split()
         # TODO add test
     def test_northern_orthocomplement(self):
-        for seg in self.segs:
-            seg.northern_orthocomplement()
+        import sphere.viewer
+        polys1 = self.poly2.segments[0].northern_orthocomplement()
+        polys2 = self.poly2.segments[1].northern_orthocomplement()
+        polys3 = self.poly2.segments[2].northern_orthocomplement()
+        print polys1[0].intersection(polys1[1])
+        sphere.viewer.view([polys1[0].complement(),
+                           polys1[1].complement()]
+                           + polys1[0].intersection(polys1[1]))
+
         # TODO add test
 
 if __name__ == '__main__':

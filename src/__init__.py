@@ -303,6 +303,18 @@ class Polygon:
             ret.append(Polygon(vertices, self.external_point))
         return ret
 
+    def northern_orthocomplement(self):
+        """ Returns the region containing exactly the points on the northern
+            hemisphere that are orthogonal to a point inside this polygon.
+            It is assumed that this polygon is itself completely contained
+            in the northern hemisphere. """
+        # TODO drop assumption
+        # TODO optimize for trivial cases
+        ret = Region([])
+        for segment in self.segments:
+            ret = ret.union(Region(segment.northern_orthocomplement()))
+        return ret
+
     def border_contains(self, point):
         """ Checks whether the border of the polygon contains the given
             point. """
