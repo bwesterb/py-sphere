@@ -1,6 +1,7 @@
 """ The unit sphere. """
 import math
 import random
+import fractions
 
 import numpy
 import numpy.linalg
@@ -661,6 +662,9 @@ class Point:
     def _get_normalized_tuple(self):
         """ Gets cartesian coordinates of the Point. """
         norm = self._get_norm()
+        # TODO Is there a way to do this without using isinstance?
+        if isinstance(self.x, fractions.Fraction):
+            norm = fractions.Fraction(norm)
         return (self.x / norm, self.y / norm, self.z / norm)
 
     def squared_distance_to(self, other):
@@ -677,6 +681,7 @@ class Point:
     def orthogonal_to(self, other):
         """ Returns whether this point is orthogonal to other. """
         scalar = scalar_product(self, other)
+        # TODO Is there a way to do this without isinstance?
         if isinstance(scalar, float):
             return abs(scalar) < 1e-10
         return scalar == 0
