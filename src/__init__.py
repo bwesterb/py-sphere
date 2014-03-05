@@ -95,29 +95,11 @@ class Polygon:
         """ Returns the union of two polygons. """
         return Region([self]).union(Region([other])).polygons
 
-    def intersection(self, other):
-        """ Finds the intersection of this polygon with another.  Will
-            return a list of polygons. """
-        # (I) First, check for the trivial cases:
-        # (I.1) this polygon is contained in the other.
-        self_in_other = True
-        for vertex in self.vertices:
-            if not other.contains(vertex):
-                self_in_other = False
-                break
-        if self_in_other:
-            return [self]
-        # (I.2) the other polygon is contained in this.
-        other_in_self = True
-        for vertex in other.vertices:
-            if not self.contains(vertex):
-                other_in_self = False
-                break
-        if other_in_self:
-            return [other]
-        # (II) Now create copies of this and the other polygon, adding the
-        # intersection points.
-        # (II.1) First, find the intersection points.
+    def _intersection_points(self, other):
+        """ Returns the intersection points and a map for each segment of
+            this and the other polygon's segment to those intersection
+            points.
+            Used by subpolygon_removed and intersection. """
         intersection_points = set()
         self_new_points = {}
         other_new_points = {}
@@ -151,11 +133,14 @@ class Polygon:
                     self_new_points[self_seg_i].add(intersection_point)
                 if not other_seg.is_endpoint(intersection_point):
                     other_new_points[other_seg_i].add(intersection_point)
-        # (II.2) If there are no intersection points, return empty list.
-        if not intersection_points:
-            return []
-        # (II.3) Sort intersection points by order on segments and
-        #        create the vertex lists
+        return intersection_points, self_new_points, other_new_points
+
+    def _order_intersection_points(self, other, self_new_points,
+                                            other_new_points):
+        """ Given the look-up-tables from ._intersection_points,
+            returns the vertex lists of this and the other polygon with
+            the intersection points added.
+            Used by subpolygon_removed and intersection. """
         self2_vertices = []
         other2_vertices = []
         for i in xrange(len(self.segments)):
@@ -172,6 +157,161 @@ class Polygon:
                                 else 1)
             other2_vertices.append(other.segments[i].point1)
             other2_vertices.extend(other_new_points[i])
+        return self2_vertices, other2_vertices
+
+    def subpolygon_removed(self, other):
+        """ Returns the polygons that remain, when the given subpolygon
+            is cut out this polygon. """
+        import sphere.viewer
+        # There are two cases:
+        #  (A) This and the subpolygon share a part of their border
+        #  (B) The subpolygon is a proper subpolygon.
+        # TODO merge some code with .intersection()
+        # (I) First, find the intersection points.
+        intersection_points, self_new_points, other_new_points \
+                    = self._intersection_points(other)
+        if not intersection_points:
+            # We are in case (B).
+            raise NotImplementedError
+        # We are in case (A).
+        # (II) Order the intersection points.
+        self2_vertices, other2_vertices = self._order_intersection_points(
+                                other, self_new_points, other_new_points)
+        # (III) Create the point to segment look-up-tables
+        point_to_self2 = {}
+        point_to_other2 = {}
+        for i, point in enumerate(self2_vertices):
+            point_to_self2[point] = i
+        for i, point in enumerate(other2_vertices):
+            point_to_other2[point] = i
+        # (IV) Now, walk over the polygon, marking the proper intersection
+        #      points with the subpolygon.
+        proper_intersections = set()
+        previously_inside = False
+        first_segment = True
+        for i in xrange(len(self2_vertices) + 1):
+            i = i % len(self2_vertices)
+            if (self2_vertices[i] not in intersection_points
+                    and not first_segment):
+                continue
+            next_segment = Segment(self2_vertices[i],
+                    self2_vertices[(i + 1) % len(self2_vertices)])
+            point = next_segment.get_center()
+            # TODO faster lookup with point_to_other2
+            now_inside = not other.border_contains(point)
+            if first_segment and self2_vertices[i] not in intersection_points:
+                first_segment = False
+                previously_inside = now_inside
+                continue
+            if now_inside != previously_inside:
+                proper_intersections.add(self2_vertices[i])
+            previously_inside = now_inside
+        if not proper_intersections:
+            # TODO
+            raise NotImplementedError
+        # (V) Determine the directions to walk the polygons.
+        point = next(iter(proper_intersections))
+        self_dr = None
+        other_dr = None
+        for dr in (-1, 1):
+            i = point_to_self2[point]
+            probe = Segment(self2_vertices[i], self2_vertices[(i + dr)
+                                        % len(self2_vertices)]).get_center()
+            if not other.border_contains(probe):
+                other_dr = dr
+            i = point_to_other2[point]
+            probe = Segment(other2_vertices[i], other2_vertices[(i + dr)
+                                        % len(other2_vertices)]).get_center()
+            if not self.border_contains(probe):
+                self_dr = dr
+        # (V) Now, extract the subpolygons.
+        # First, find a proper intersection point not yet visited.
+        ret = []
+        while proper_intersections:
+            point = proper_intersections.pop()
+            vertices = [point]
+            had = set(vertices)
+            on_other = True
+            i = point_to_other2[point]
+            dr = None
+            for _dr in (-1, 1):
+                probe = Segment(other2_vertices[i], other2_vertices[(i + _dr)
+                                        % len(other2_vertices)]).get_center()
+                if not self.border_contains(probe):
+                    dr = _dr
+            assert dr is not None
+            # Now, walk.
+            print point
+            while True:
+                # Find the next vertex
+                i = ((i + dr) % len(other2_vertices if on_other
+                                        else self2_vertices))
+                point = (other2_vertices if on_other else self2_vertices)[i]
+                print point
+                # Did we visit it?
+                if point in had:
+                    break
+                vertices.append(point)
+                # Is it a proper intersection?
+                if point in proper_intersections:
+                    on_other = not on_other
+                    i = (point_to_other2[point] if on_other
+                                else point_to_self2[point])
+                    proper_intersections.remove(point)
+                    dr = None
+                    for _dr in (-1, 1):
+                        _vertices = (other2_vertices if on_other
+                                        else self2_vertices)
+                        probe = Segment(_vertices[i], _vertices[(i + _dr)
+                                                % len(_vertices)]).get_center()
+                        if not (self if on_other else other).border_contains(
+                                                                    probe):
+                            dr = _dr
+                    assert dr is not None
+            try:
+                ret.append(Polygon(vertices, self.external_point))
+            except Exception:
+                sphere.viewer.view([self, other] + vertices)
+        return ret
+
+
+    def intersection(self, other):
+        """ Finds the intersection of this polygon with another.  Will
+            return a list of polygons. """
+        # (I) First, check for the simpler cases:
+        # (I.1) this polygon is contained in the other.
+        self_in_other = True
+        for vertex in self.vertices:
+            if not other.contains(vertex):
+                self_in_other = False
+                break
+        if self_in_other:
+            if not other.contains(self.external_point):
+                return [self]
+            return other.subpolygon_removed(self.complement())
+        # (I.2) the other polygon is contained in this.
+        other_in_self = True
+        for vertex in other.vertices:
+            if not self.contains(vertex):
+                other_in_self = False
+                break
+        if other_in_self:
+            print 'other_in_self'
+            if not self.contains(other.external_point):
+                return [other]
+            return self.subpolygon_removed(other.complement())
+        # (II) Now create copies of this and the other polygon, adding the
+        # intersection points.
+        # (II.1) First, find the intersection points.
+        intersection_points, self_new_points, other_new_points \
+                    = self._intersection_points(other)
+        # (II.2) If there are no intersection points, return empty list.
+        if not intersection_points:
+            return []
+        # (II.3) Sort intersection points by order on segments and
+        #        create the vertex lists
+        self2_vertices, other2_vertices = self._order_intersection_points(
+                                other, self_new_points, other_new_points)
         # (II.4) Create the point to segment look-up-tables
         point_to_self2 = {}
         point_to_other2 = {}
